@@ -98,7 +98,6 @@ router.get('/', async (req, res) => {
         '-err_detect', 'ignore_err',
         // Limit max demux delay to prevent buffering issues with bad timestamps
         '-max_delay', '5000000',
-        '-http_persistent', '0',
         // Reconnect settings for network drops
         '-reconnect', '1',
         '-reconnect_streamed', '1',

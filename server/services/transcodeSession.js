@@ -199,7 +199,6 @@ class TranscodeSession extends EventEmitter {
             '-analyzeduration', '3000000',
             '-fflags', '+genpts+discardcorrupt',
             '-err_detect', 'ignore_err',
-            '-http_persistent', '0',
             '-reconnect', '1',
             '-reconnect_streamed', '1',
             '-reconnect_on_http_error', '4xx,5xx',
