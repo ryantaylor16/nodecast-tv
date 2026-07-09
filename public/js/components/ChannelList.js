@@ -664,6 +664,7 @@ class ChannelList {
      */
     computeSourceBadges() {
         this.sourceBadgeById = {};
+        this._badgesComputed = true;
         const enabled = (this.sources || []).filter(s => s.enabled);
         // Only worth showing when more than one source can appear in a list.
         this.showSourceBadges = enabled.length > 1;

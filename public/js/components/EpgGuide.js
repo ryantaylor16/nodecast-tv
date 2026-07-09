@@ -248,18 +248,67 @@ class EpgGuide {
 
         // Build secondary indexes for faster lookup
         this.channelMap = new Map();
-        // Index by ID
+        // US call-sign -> EPG channel, so provider channels with no tvg-id can
+        // still bind to guides like epgshare01 (id "KABC-DT.us_locals1").
+        this.callsignMap = new Map();
+        // Which EPG channel ids actually have programmes — used to prefer a
+        // real guide over the provider's own empty EPG entry when both share
+        // a call sign (e.g. epgshare01 "KABC-DT" vs provider "loc.ABC (KABC)").
+        const channelsWithProgrammes = new Set((this.programmes || []).map(p => p.channel_id || p.channelId));
         this.channels.forEach(ch => {
             this.channelMap.set(ch.id, ch);
             // Also index by name (normalized) for fallback matching
             if (ch.name) {
                 this.channelMap.set(ch.name.toLowerCase(), ch);
             }
+            // Derive the call sign from the EPG channel's id and name.
+            const cs = this.extractCallsign(ch.id) || this.extractCallsign(ch.name);
+            if (cs) {
+                const existing = this.callsignMap.get(cs);
+                const chHasProg = channelsWithProgrammes.has(ch.id);
+                const existingHasProg = existing && channelsWithProgrammes.has(existing.id);
+                // Take this channel if none mapped yet, or if it has programmes
+                // and the currently-mapped one doesn't.
+                if (!existing || (chHasProg && !existingHasProg)) {
+                    this.callsignMap.set(cs, ch);
+                }
+            }
         });
 
         // Load favorites
         const favs = await API.favorites.getAll();
         this.favorites = new Set(favs.map(f => `${f.source_id}:${f.item_id}`));
+    }
+
+    /**
+     * Extract a US broadcast call sign (e.g. KABC, WNBC) from a string.
+     * Requires word boundaries so "WORLD"/"KIDS" don't false-match.
+     * Returns the upper-case call sign or null.
+     */
+    extractCallsign(str) {
+        if (!str) return null;
+        const m = String(str).toUpperCase().match(/\b([KW][A-Z]{2,3})\b/);
+        return m ? m[1] : null;
+    }
+
+    /**
+     * Resolve a provider channel to an EPG channel by, in order:
+     * exact tvg-id, exact (normalized) name, then US call sign extracted
+     * from the channel name. The call-sign step is what lets provider
+     * channels that ship with an empty tvg-id still get guide data.
+     */
+    resolveEpgChannel(tvgId, channelName) {
+        if (tvgId && this.channelMap && this.channelMap.has(tvgId)) {
+            return this.channelMap.get(tvgId);
+        }
+        if (channelName && this.channelMap && this.channelMap.has(channelName.toLowerCase())) {
+            return this.channelMap.get(channelName.toLowerCase());
+        }
+        if (channelName && this.callsignMap && this.callsignMap.size > 0) {
+            const cs = this.extractCallsign(channelName);
+            if (cs && this.callsignMap.has(cs)) return this.callsignMap.get(cs);
+        }
+        return null;
     }
 
     /**
@@ -271,18 +320,8 @@ class EpgGuide {
     getCurrentProgram(tvgId, channelName) {
         if (!this.programmes || this.programmes.length === 0) return null;
 
-        // Find EPG channel using fast map lookup
-        let epgChannel = null;
-        if (tvgId && this.channelMap && this.channelMap.has(tvgId)) {
-            epgChannel = this.channelMap.get(tvgId);
-        } else if (channelName && this.channelMap) {
-            epgChannel = this.channelMap.get(channelName.toLowerCase());
-        } else {
-            // Fallback to slow search if map fails or not built yet
-            epgChannel = this.channels.find(epg =>
-                (tvgId && epg.id === tvgId) || epg.name === channelName
-            );
-        }
+        // Find EPG channel by id, then name, then US call sign.
+        const epgChannel = this.resolveEpgChannel(tvgId, channelName);
 
         if (!epgChannel) return null;
 
@@ -369,10 +408,8 @@ class EpgGuide {
 
         // Match ALL playable channels with optional EPG data
         const allChannels = playableChannels.map(sourceChannel => {
-            // Try to find matching EPG channel by tvgId or name
-            const epgChannel = this.channels.find(epg =>
-                epg.id === sourceChannel.tvgId || epg.name === sourceChannel.name
-            );
+            // Match by tvg-id, then name, then US call sign (for empty tvg-ids)
+            const epgChannel = this.resolveEpgChannel(sourceChannel.tvgId, sourceChannel.name);
             return { epgChannel, sourceChannel };
         });
 
