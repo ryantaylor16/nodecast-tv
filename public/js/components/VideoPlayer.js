@@ -875,8 +875,15 @@ class VideoPlayer {
             // Determine if HLS or direct stream
             this.currentUrl = streamUrl;
 
+            // Live HLS streams from these providers are always browser-friendly
+            // (h264/AAC). Probing them just adds 1-3s of startup latency AND
+            // opens a second provider connection, which fights the common
+            // max_connections=1 limit. Skip the probe for HLS and go straight
+            // to the proxied HLS playback path below.
+            const streamIsHls = typeof streamUrl === 'string' && streamUrl.includes('.m3u8');
+
             // CHECK: Auto Transcode (Smart) - probe first, then decide
-            if (this.settings.autoTranscode) {
+            if (this.settings.autoTranscode && !streamIsHls) {
                 console.log('[Player] Auto Transcode enabled. Probing stream...');
                 try {
                     const probeRes = await fetch(`/api/probe?url=${encodeURIComponent(streamUrl)}`);
