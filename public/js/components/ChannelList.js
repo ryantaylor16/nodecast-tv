@@ -665,7 +665,9 @@ class ChannelList {
     computeSourceBadges() {
         this.sourceBadgeById = {};
         this._badgesComputed = true;
-        const enabled = (this.sources || []).filter(s => s.enabled);
+        // Only channel-bearing sources matter here; EPG-only sources never
+        // own a channel and would otherwise break the common-prefix stripping.
+        const enabled = (this.sources || []).filter(s => s.enabled && s.type !== 'epg');
         // Only worth showing when more than one source can appear in a list.
         this.showSourceBadges = enabled.length > 1;
         if (!this.showSourceBadges) return;
@@ -693,6 +695,11 @@ class ChannelList {
      * HTML for a channel's source badge, or empty string when not applicable.
      */
     renderSourceBadge(sourceId) {
+        // Self-heal: compute badge metadata on first use if sources are loaded
+        // but computeSourceBadges() hasn't run yet (e.g. a re-render on revisit).
+        if (!this._badgesComputed && this.sources && this.sources.length) {
+            this.computeSourceBadges();
+        }
         if (!this.showSourceBadges) return '';
         const badge = this.sourceBadgeById?.[sourceId];
         if (!badge) return '';
@@ -1089,7 +1096,7 @@ class ChannelList {
                  alt="" onerror="this.onerror=null;this.src='/img/placeholder.png'">
             <div class="channel-info">
               <div class="channel-name">${this.escapeHtml(channel.name)}</div>
-              <div class="channel-program">${this.getProgramInfo(channel) || ''}</div>
+              <div class="channel-program">${this.renderSourceBadge(channel.sourceId)}${this.escapeHtml(this.getProgramInfo(channel) || '')}</div>
             </div>
             <button class="favorite-btn active" title="Remove from Favorites">
               ❤️
