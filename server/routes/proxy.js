@@ -37,13 +37,22 @@ function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = fal
     const db = getDb();
     let query = `
         SELECT item_id, name, stream_icon, added_at, rating, container_extension, year, category_id, data
-        FROM playlist_items 
+        FROM playlist_items
         WHERE source_id = ? AND type = ?
     `;
-    if (!includeHidden) {
-        query += ` AND is_hidden = 0`;
-    }
     const params = [sourceId, type];
+    if (!includeHidden) {
+        // Hide an item if its own flag is set OR its category is hidden.
+        // The category rule auto-covers items added by future syncs, which
+        // are always inserted with is_hidden = 0.
+        query += `
+            AND is_hidden = 0
+            AND category_id NOT IN (
+                SELECT category_id FROM categories
+                WHERE source_id = ? AND type = ? AND is_hidden = 1
+            )`;
+        params.push(sourceId, type);
+    }
 
     if (categoryId) {
         query += ` AND category_id = ?`;
