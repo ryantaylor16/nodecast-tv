@@ -29,6 +29,11 @@ app.use(passport.session());
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Serve locally-hosted EPG files (e.g. a pre-filtered XMLTV) from the data
+// volume, so an 'epg' source can point at http://localhost:PORT/epg-static/...
+// instead of pulling a huge nationwide feed on every refresh.
+app.use('/epg-static', express.static(path.join(__dirname, '..', 'data', 'epg-static')));
+
 // FFMPEG Configuration (optional - for transcoding support)
 // Priority: 1. System FFmpeg (better Docker DNS support), 2. ffmpeg-static npm package
 const { execSync } = require('child_process');
