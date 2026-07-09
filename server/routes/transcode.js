@@ -71,7 +71,7 @@ const FFMPEG_PROTOCOL_WHITELIST = 'http,https,tcp,tls,crypto';
  * Body: { url: string, seekOffset?: number }
  */
 router.post('/session', async (req, res) => {
-    const { url, seekOffset, videoMode, videoCodec, audioCodec, audioChannels } = req.body;
+    const { url, seekOffset, videoMode, videoCodec, audioCodec, audioChannels, videoHeight } = req.body;
 
     if (!url) {
         return res.status(400).json({ error: 'URL is required' });
@@ -97,7 +97,8 @@ router.post('/session', async (req, res) => {
             videoMode: videoMode, // 'copy' or 'encode'
             videoCodec: videoCodec, // 'h264', 'hevc', etc.
             audioCodec: audioCodec, // 'aac', 'ac3', etc.
-            audioChannels: audioChannels // number of channels (2=stereo)
+            audioChannels: audioChannels, // number of channels (2=stereo)
+            videoHeight: videoHeight // source height from probe; used to cap max-resolution in JS
         });
 
         await session.start();
@@ -245,10 +246,12 @@ router.get('/', async (req, res) => {
         '-err_detect', 'ignore_err',
         // Limit max demux delay to prevent buffering issues
         '-max_delay', '2000000',
+        '-http_persistent', '0',
         // Reconnect settings for network drops (useful for live streams)
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '3',
+        '-reconnect_on_http_error', '4xx,5xx',
+        '-reconnect_delay_max', '10',
         // Prevent Range/HEAD requests that some providers reject with 405
         '-seekable', '0',
         '-i', url,
