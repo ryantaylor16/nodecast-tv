@@ -208,7 +208,9 @@ app.listen(PORT, async () => {
 
     // Trigger background sync with delay to allow server to settle
     setTimeout(async () => {
-        await syncService.syncAll().catch(console.error);
+        // Skip sources that are still fresh so a restart doesn't trigger a
+        // full reimport of data that's already in the persistent DB.
+        await syncService.syncAll({ skipFresh: true }).catch(console.error);
         // Start the server-side sync timer after initial sync
         await syncService.startSyncTimer().catch(console.error);
 

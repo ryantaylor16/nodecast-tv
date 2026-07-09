@@ -321,6 +321,24 @@ class HomePage {
             });
         });
 
+        // Remove-from-history (×) buttons
+        list.querySelectorAll('.card-remove-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation(); // don't trigger the card's play handler
+                const removeId = btn.dataset.removeId;
+                try {
+                    await window.API.request('DELETE', `/history/${removeId}`);
+                    btn.closest('.dashboard-card')?.remove();
+                    // Hide the section entirely once the last item is gone.
+                    if (list.querySelectorAll('.dashboard-card').length === 0) {
+                        section.classList.add('hidden');
+                    }
+                } catch (err) {
+                    console.error('[Dashboard] Failed to remove from Continue Watching:', err);
+                }
+            });
+        });
+
         // Update scroll arrows after content renders
         this.updateScrollArrows();
     }
@@ -418,6 +436,7 @@ class HomePage {
             <div class="dashboard-card" data-id="${item_id}" data-type="${type}">
                 <div class="card-image">
                     <img src="${posterUrl}" alt="${data.title || item.name}" loading="lazy" onerror="this.onerror=null;this.src='/img/poster-placeholder.jpg'">
+                    <button class="card-remove-btn" data-remove-id="${item_id}" title="Remove from Continue Watching" aria-label="Remove from Continue Watching">&times;</button>
                     <div class="progress-bar-container">
                         <div class="progress-bar" style="width: ${percent}%"></div>
                     </div>

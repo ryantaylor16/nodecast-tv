@@ -85,20 +85,46 @@ class SyncService {
     /**
      * Sync all enabled sources
      */
-    async syncAll() {
-        console.log('[Sync] Starting global sync...');
+    async syncAll(opts = {}) {
+        const { skipFresh = false } = opts;
+        console.log(`[Sync] Starting global sync...${skipFresh ? ' (skipping already-fresh sources)' : ''}`);
         try {
             const allSources = await sources.getAll();
             for (const source of allSources) {
-                if (source.enabled) {
-                    // Run sequentially to not overload
-                    await this.syncSource(source.id);
+                if (!source.enabled) continue;
+                // On startup, don't re-pull a source whose data is still within
+                // its refresh window — it's already in the persistent DB. This
+                // avoids a full 2-3 min reimport on every container restart.
+                if (skipFresh && this.isSourceFresh(source)) {
+                    console.log(`[Sync] ${source.name} is fresh, skipping (last sync within refresh window)`);
+                    continue;
                 }
+                // Run sequentially to not overload
+                await this.syncSource(source.id);
             }
             this.lastSyncTime = new Date();
             console.log('[Sync] Global sync completed at', this.lastSyncTime.toISOString());
         } catch (err) {
             console.error('[Sync] Global sync failed:', err);
+        }
+    }
+
+    /**
+     * Is a source's most recent successful sync still within its refresh window?
+     * Used to skip redundant reimports on startup.
+     */
+    isSourceFresh(source) {
+        try {
+            const db = getDb();
+            const row = db.prepare(
+                `SELECT MAX(last_sync) AS ls FROM sync_status WHERE source_id = ? AND status = 'success'`
+            ).get(source.id);
+            if (!row || !row.ls) return false;
+            const ageMs = Date.now() - Number(row.ls);
+            const hours = Number(source.refreshHours) > 0 ? Number(source.refreshHours) : 24;
+            return ageMs < hours * 60 * 60 * 1000;
+        } catch (e) {
+            return false; // On any doubt, sync.
         }
     }
 
