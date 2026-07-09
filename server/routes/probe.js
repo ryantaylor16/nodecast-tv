@@ -35,7 +35,7 @@ function probeStream(url, ffprobePath, userAgent = null, timeout = 15000) {
             '-user_agent', userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
             '-reconnect', '1',
             '-reconnect_streamed', '1',
-            '-reconnect_on_http_error', '4xx,5xx',
+            '-reconnect_on_http_error', '5xx',
             '-reconnect_delay_max', '10',
             '-print_format', 'json',
             '-show_streams',

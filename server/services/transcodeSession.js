@@ -201,7 +201,7 @@ class TranscodeSession extends EventEmitter {
             '-err_detect', 'ignore_err',
             '-reconnect', '1',
             '-reconnect_streamed', '1',
-            '-reconnect_on_http_error', '4xx,5xx',
+            '-reconnect_on_http_error', '5xx',
             '-reconnect_delay_max', '10',
             // Prevent Range/HEAD requests that some providers reject
             '-seekable', '0'

@@ -257,7 +257,7 @@ router.get('/', async (req, res) => {
         // Reconnect settings for network drops (useful for live streams)
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_on_http_error', '4xx,5xx',
+        '-reconnect_on_http_error', '5xx',
         '-reconnect_delay_max', '10',
         // Prevent Range/HEAD requests that some providers reject with 405
         '-seekable', '0',
