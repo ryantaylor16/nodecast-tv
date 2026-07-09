@@ -251,10 +251,20 @@ class EpgGuide {
         // US call-sign -> EPG channel, so provider channels with no tvg-id can
         // still bind to guides like epgshare01 (id "KABC-DT.us_locals1").
         this.callsignMap = new Map();
+        // Normalized channel name -> EPG channel, for cable/national channels
+        // that have neither a tvg-id nor a call sign (e.g. "GO: ESPNU" -> the
+        // "ESPNU HD" entry in epgshare01 US2).
+        this.normalizedNameMap = new Map();
         // Which EPG channel ids actually have programmes — used to prefer a
         // real guide over the provider's own empty EPG entry when both share
         // a call sign (e.g. epgshare01 "KABC-DT" vs provider "loc.ABC (KABC)").
         const channelsWithProgrammes = new Set((this.programmes || []).map(p => p.channel_id || p.channelId));
+        const preferWithProgrammes = (map, key, ch) => {
+            const existing = map.get(key);
+            const chHasProg = channelsWithProgrammes.has(ch.id);
+            const existingHasProg = existing && channelsWithProgrammes.has(existing.id);
+            if (!existing || (chHasProg && !existingHasProg)) map.set(key, ch);
+        };
         this.channels.forEach(ch => {
             this.channelMap.set(ch.id, ch);
             // Also index by name (normalized) for fallback matching
@@ -263,15 +273,13 @@ class EpgGuide {
             }
             // Derive the call sign from the EPG channel's id and name.
             const cs = this.extractCallsign(ch.id) || this.extractCallsign(ch.name);
-            if (cs) {
-                const existing = this.callsignMap.get(cs);
-                const chHasProg = channelsWithProgrammes.has(ch.id);
-                const existingHasProg = existing && channelsWithProgrammes.has(existing.id);
-                // Take this channel if none mapped yet, or if it has programmes
-                // and the currently-mapped one doesn't.
-                if (!existing || (chHasProg && !existingHasProg)) {
-                    this.callsignMap.set(cs, ch);
-                }
+            if (cs) preferWithProgrammes(this.callsignMap, cs, ch);
+            // Normalized-name index: build from display-name and from an
+            // id-derived name ("ESPNU.HD.us2" -> "ESPNU").
+            const idName = String(ch.id || '').replace(/\.(HD|SD|FHD|UHD|us2?|us_locals\d*)\b/gi, ' ').replace(/\./g, ' ');
+            for (const src of [ch.name, idName]) {
+                const norm = this.normalizeChannelName(src);
+                if (norm && norm.length >= 3) preferWithProgrammes(this.normalizedNameMap, norm, ch);
             }
         });
 
@@ -292,6 +300,22 @@ class EpgGuide {
     }
 
     /**
+     * Normalize a channel name for cross-source matching: drop the provider
+     * prefix ("GO:", "US|", "## "), parentheticals, and quality/format tokens,
+     * then keep only alphanumerics. "GO: ESPN 2 ᴴᴰ" and "ESPN2 HD" both
+     * collapse to "ESPN2".
+     */
+    normalizeChannelName(str) {
+        if (!str) return '';
+        let s = String(str).toUpperCase();
+        s = s.replace(/^[\s#]*[A-Z0-9]{1,4}\s*[:|]\s*/, ''); // leading "GO: " / "US| "
+        s = s.replace(/\([^)]*\)/g, ' ');                     // "(Alternate)"
+        s = s.replace(/\b(HD|FHD|UHD|SD|4K|8K|RAW|FPS)\b/g, ' '); // quality tokens
+        s = s.replace(/[^A-Z0-9]/g, '');                      // keep alphanumerics
+        return s;
+    }
+
+    /**
      * Resolve a provider channel to an EPG channel by, in order:
      * exact tvg-id, exact (normalized) name, then US call sign extracted
      * from the channel name. The call-sign step is what lets provider
@@ -307,6 +331,14 @@ class EpgGuide {
         if (channelName && this.callsignMap && this.callsignMap.size > 0) {
             const cs = this.extractCallsign(channelName);
             if (cs && this.callsignMap.has(cs)) return this.callsignMap.get(cs);
+        }
+        // Last resort: normalized-name match for cable/national channels
+        // (ESPN, ESPN2, SEC Network, ...) that have no tvg-id and no call sign.
+        if (channelName && this.normalizedNameMap && this.normalizedNameMap.size > 0) {
+            const norm = this.normalizeChannelName(channelName);
+            if (norm && norm.length >= 3 && this.normalizedNameMap.has(norm)) {
+                return this.normalizedNameMap.get(norm);
+            }
         }
         return null;
     }

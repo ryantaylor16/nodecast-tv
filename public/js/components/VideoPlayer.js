@@ -50,7 +50,7 @@ class VideoPlayer {
             rememberVolume: true,
             lastVolume: 80,
             autoPlayNextEpisode: false,
-            forceProxy: false,
+            forceProxy: true, // providers here are CORS-locked; proxy streams via server
             forceTranscode: false,
             forceRemux: false,
             autoTranscode: true,
