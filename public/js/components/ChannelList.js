@@ -513,7 +513,7 @@ class ChannelList {
                  alt="" onerror="this.onerror=null;this.src='/img/placeholder.png'">
             <div class="channel-info">
               <div class="channel-name">${this.escapeHtml(channel.name)}</div>
-              <div class="channel-program">${this.escapeHtml(this.getProgramInfo(channel) || '')}</div>
+              <div class="channel-program">${this.renderSourceBadge(channel.sourceId)}${this.escapeHtml(this.getProgramInfo(channel) || '')}</div>
             </div>
             <button class="favorite-btn ${isFavorite ? 'active' : ''}" title="${isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}">
               ${isFavorite ? Icons.favorite : Icons.favoriteOutline}
@@ -626,7 +626,7 @@ class ChannelList {
                  alt="" onerror="this.onerror=null;this.src='/img/placeholder.png'">
             <div class="channel-info">
               <div class="channel-name">${this.escapeHtml(channel.name)}</div>
-              <div class="channel-program">${this.escapeHtml(this.getProgramInfo(channel) || '')}</div>
+              <div class="channel-program">${this.renderSourceBadge(channel.sourceId)}${this.escapeHtml(this.getProgramInfo(channel) || '')}</div>
             </div>
             <button class="favorite-btn ${isFavorite ? 'active' : ''}" title="${isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}">
               ${isFavorite ? Icons.favorite : Icons.favoriteOutline}
@@ -656,12 +656,56 @@ class ChannelList {
     }
 
     /**
+     * Build per-source badge labels and colors, shown on each channel so it's
+     * clear which provider a channel comes from (useful in Favorites, where
+     * channels from multiple sources are interleaved).
+     * Labels strip the common prefix shared by all source names for brevity
+     * (e.g. "Pure HD Primary"/"Pure HD Secondary" -> "Primary"/"Secondary").
+     */
+    computeSourceBadges() {
+        this.sourceBadgeById = {};
+        const enabled = (this.sources || []).filter(s => s.enabled);
+        // Only worth showing when more than one source can appear in a list.
+        this.showSourceBadges = enabled.length > 1;
+        if (!this.showSourceBadges) return;
+
+        // Longest common word-prefix across all source names.
+        const wordLists = enabled.map(s => (s.name || `Source ${s.id}`).trim().split(/\s+/));
+        let commonPrefix = 0;
+        const minLen = Math.min(...wordLists.map(w => w.length));
+        for (let i = 0; i < minLen; i++) {
+            const word = wordLists[0][i];
+            if (wordLists.every(w => w[i] === word)) commonPrefix++;
+            else break;
+        }
+
+        const palette = ['#e0507a', '#4a90d9', '#3fa66a', '#c98a2b', '#8a63d2', '#3aa6a6'];
+        enabled.forEach((s, idx) => {
+            const words = wordLists[idx];
+            // Drop the shared prefix; if that empties the label, fall back to full name.
+            const label = words.slice(commonPrefix).join(' ') || words.join(' ');
+            this.sourceBadgeById[s.id] = { label, color: palette[idx % palette.length] };
+        });
+    }
+
+    /**
+     * HTML for a channel's source badge, or empty string when not applicable.
+     */
+    renderSourceBadge(sourceId) {
+        if (!this.showSourceBadges) return '';
+        const badge = this.sourceBadgeById?.[sourceId];
+        if (!badge) return '';
+        return `<span class="channel-source-badge" style="--badge-color: ${badge.color}">${this.escapeHtml(badge.label)}</span>`;
+    }
+
+    /**
      * Load sources into dropdown
      */
     async loadSources() {
         try {
             this.sources = await API.sources.getAll();
             console.log('[ChannelList] loadSources: Got', this.sources?.length || 0, 'sources');
+            this.computeSourceBadges();
             this.sourceSelect.innerHTML = '<option value="">All Sources</option>';
 
             const xtreamSources = this.sources.filter(s => s.type === 'xtream' && s.enabled);

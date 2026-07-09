@@ -669,6 +669,21 @@ h4 {
   text-overflow: ellipsis;
 }
 
+.channel-source-badge {
+  display: inline-block;
+  vertical-align: baseline;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: var(--badge-color, #888);
+  background: color-mix(in srgb, var(--badge-color, #888) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-color, #888) 40%, transparent);
+}
+
 /* =====================================================
    Video Player Section
    ===================================================== */
