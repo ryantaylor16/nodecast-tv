@@ -534,17 +534,34 @@ class TranscodeSession extends EventEmitter {
      * Stop the transcoding process
      */
     stop() {
-        if (this.process) {
-            console.log(`[TranscodeSession ${this.id}] Stopping FFmpeg process`);
-            this.process.kill('SIGTERM');
-            // Force kill after 2 seconds if still running
-            setTimeout(() => {
-                if (this.process) {
-                    this.process.kill('SIGKILL');
+        const proc = this.process;
+        this.status = 'stopped';
+        if (!proc) return Promise.resolve();
+
+        console.log(`[TranscodeSession ${this.id}] Stopping FFmpeg process`);
+        // Resolve only once FFmpeg has actually exited, so the provider's
+        // connection slot is released before the caller starts a new stream.
+        // Critical for accounts with max_connections = 1, where an overlapping
+        // process would make the provider refuse the next channel.
+        return new Promise((resolve) => {
+            let settled = false;
+            const done = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(killTimer);
+                resolve();
+            };
+            proc.once('exit', done);
+            proc.kill('SIGTERM');
+            // Escalate to SIGKILL if it hasn't exited in time.
+            const killTimer = setTimeout(() => {
+                if (!settled) {
+                    try { proc.kill('SIGKILL'); } catch (e) { /* already gone */ }
                 }
             }, 2000);
-        }
-        this.status = 'stopped';
+            // Absolute backstop so a stuck 'exit' never hangs the caller.
+            setTimeout(done, 4000);
+        });
     }
 
     /**
@@ -651,7 +668,7 @@ class TranscodeSession extends EventEmitter {
      * Delete session directory and all segments
      */
     async cleanup() {
-        this.stop();
+        await this.stop();
         try {
             await fs.rm(this.dir, { recursive: true, force: true });
             console.log(`[TranscodeSession ${this.id}] Cleaned up session directory`);

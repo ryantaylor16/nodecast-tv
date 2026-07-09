@@ -42,14 +42,15 @@ function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = fal
     `;
     const params = [sourceId, type];
     if (!includeHidden) {
-        // Hide an item if its own flag is set OR its category is hidden.
-        // The category rule auto-covers items added by future syncs, which
-        // are always inserted with is_hidden = 0.
+        // Whitelist: only show items whose category is explicitly visible.
+        // This auto-covers items added by future syncs (always inserted with
+        // is_hidden = 0) and orphan items whose category_id matches no known
+        // category — both of which a "NOT IN (hidden)" blacklist would leak.
         query += `
             AND is_hidden = 0
-            AND category_id NOT IN (
+            AND category_id IN (
                 SELECT category_id FROM categories
-                WHERE source_id = ? AND type = ? AND is_hidden = 1
+                WHERE source_id = ? AND type = ? AND is_hidden = 0
             )`;
         params.push(sourceId, type);
     }

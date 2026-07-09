@@ -19,6 +19,10 @@ function getDb() {
         // Optimize performance
         db.pragma('journal_mode = WAL');
         db.pragma('synchronous = NORMAL');
+        // Wait up to 8s for a lock instead of throwing SQLITE_BUSY immediately.
+        // The daily sync writes hundreds of thousands of rows in large
+        // transactions; without this, concurrent reads (playlist/EPG) error out.
+        db.pragma('busy_timeout = 8000');
         initSchema();
     }
     return db;
