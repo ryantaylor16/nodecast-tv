@@ -116,9 +116,10 @@ router.get('/', async (req, res) => {
         '-c', 'copy',
         // Ensure extradata is correctly extracted/converted (fixes Annex B -> AVCC issues in Firefox)
         '-bsf:v', 'dump_extra',
-        // NOTE: We intentionally do NOT use -bsf:a aac_adtstoasc here
-        // That filter only works for AAC audio and breaks AC3/EAC3/MP3.
-        // If AAC audio from MPEG-TS fails in MP4, use /api/transcode instead.
+        // Convert ADTS AAC (common in MPEG-TS) to the ASC form MP4 requires.
+        // Applied ONLY when the caller reports AAC audio — this filter errors
+        // on AC3/EAC3/MP3, which is why it isn't applied unconditionally.
+        ...(/aac/i.test(req.query.acodec || '') ? ['-bsf:a', 'aac_adtstoasc'] : []),
         // Handle timestamp discontinuities at output
         '-fps_mode', 'passthrough',
         '-max_muxing_queue_size', '1024',

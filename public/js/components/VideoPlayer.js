@@ -954,7 +954,10 @@ class VideoPlayer {
                         // Raw .ts container - use remux
                         console.log('[Player] Auto: Using remux (.ts container)');
                         this.updateTranscodeStatus('remuxing', 'Remux (Auto)');
-                        const remuxUrl = `/api/remux?url=${encodeURIComponent(streamUrl)}`;
+                        // Pass the probed audio codec so remux can add aac_adtstoasc
+                        // only for AAC (required to mux ADTS AAC from TS into MP4).
+                        const acodec = encodeURIComponent(info.audio || '');
+                        const remuxUrl = `/api/remux?url=${encodeURIComponent(streamUrl)}&acodec=${acodec}`;
                         this.currentUrl = remuxUrl;
                         this.video.src = remuxUrl;
                         this.video.play().catch(e => {
