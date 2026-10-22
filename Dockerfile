@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && if [ "$TARGETARCH" = "amd64" ]; then \
         DRIVERS="mesa-va-drivers intel-media-va-driver vainfo"; \
     else \
